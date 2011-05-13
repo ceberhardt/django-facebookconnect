@@ -24,7 +24,6 @@ from django.template.loader import render_to_string
 from django.contrib.sites.models import Site
 from django.contrib.auth import REDIRECT_FIELD_NAME
 
-from facebook.djangofb import get_facebook_client
 from facebookconnect.models import FacebookTemplate, FacebookProfile
 
 register = template.Library()
@@ -43,7 +42,7 @@ def show_facebook_name(context, user):
         #if we're rendering widgets, link direct to facebook
         return {'string':u'<fb:name uid="%s" />' % (p.facebook_id)}
     else:
-        return {'string':u'<a href="%s">%s</a>' % (p.get_absolute_url(), p.full_name)}
+        return {'string':u'<a href="%s">%s</a>' % (p.get_absolute_url(), p.full_name(context['facebook']))}
 
 @register.inclusion_tag('facebook/show_string.html', takes_context=True)
 def show_facebook_first_name(context, user):
@@ -55,7 +54,7 @@ def show_facebook_first_name(context, user):
         #if we're rendering widgets, link direct to facebook
         return {'string':u'<fb:name uid="%s" firstnameonly="true" />' % (p.facebook_id)}
     else:
-        return {'string':u'<a href="%s">%s</a>' % (p.get_absolute_url(), p.first_name)}
+        return {'string':u'<a href="%s">%s</a>' % (p.get_absolute_url(), p.first_name(context['facebook']))}
     
 @register.inclusion_tag('facebook/show_string.html', takes_context=True)
 def show_facebook_possesive(context, user):
@@ -75,7 +74,7 @@ def show_facebook_greeting(context, user):
         #if we're rendering widgets, link direct to facebook
         return {'string':u'Hello, <fb:name uid="%s" useyou="false" firstnameonly="true" />' % (p.facebook_id)}
     else:
-        return {'string':u'Hello, <a href="%s">%s</a>!' % (p.get_absolute_url(), p.first_name)}
+        return {'string':u'Hello, <a href="%s">%s</a>!' % (p.get_absolute_url(), p.first_name(context['facebook']))}
 
 @register.inclusion_tag('facebook/show_string.html', takes_context=True)
 def show_facebook_status(context, user):
@@ -93,9 +92,9 @@ def show_facebook_photo(context, user):
         p = user.facebook_profile
     if p.get_absolute_url(): url = p.get_absolute_url()
     else: url = ""
-    if p.picture_url: pic_url = p.picture_url
+    if p.picture_url(context['facebook']): pic_url = p.picture_url(context['facebook'])
     else: pic_url = ""
-    if p.full_name: name = p.full_name
+    if p.full_name(context['facebook']): name = p.full_name(context['facebook'])
     else: name = ""
     if getattr(settings, 'WIDGET_MODE', None):
         #if we're rendering widgets, link direct to facebook
@@ -109,7 +108,7 @@ def show_facebook_info(context, user):
         p = user
     else:
         p = user.facebook_profile
-    return {'profile_url':p.get_absolute_url(), 'picture_url':p.picture_url, 'full_name':p.full_name, 'networks':p.networks}
+    return {'profile_url':p.get_absolute_url(), 'picture_url':p.picture_url(context['facebook']), 'full_name':p.full_name(context['facebook']), 'networks':p.networks(context['facebook'])}
 
 @register.inclusion_tag('facebook/mosaic.html')
 def show_profile_mosaic(profiles):
@@ -123,7 +122,7 @@ def show_connect_button(context):
     
     if ('user' in context and hasattr(context['user'], 'facebook_profile') and
          context['user'].facebook_profile and
-         context['user'].facebook_profile.is_authenticated()):
+         context['user'].facebook_profile.is_authenticated(context['facebook'])):
         logged_in = True
     else: logged_in = False
     return {REDIRECT_FIELD_NAME:redirect_url, 'logged_in':logged_in}
@@ -143,9 +142,9 @@ def js_string(value):
     return re.sub(r'[\r\n]+', '', value)
 
 @register.inclusion_tag('facebook/invite.html')
-def show_invite_link(invitation_template="facebook/invitation.fbml", show_link=True):
+def show_invite_link(context, invitation_template="facebook/invitation.fbml", show_link=True):
     """display an invite friends link"""
-    fb = get_facebook_client()
+    fb = context['facebook']
     current_site = Site.objects.get_current()
     
     content = render_to_string(invitation_template,

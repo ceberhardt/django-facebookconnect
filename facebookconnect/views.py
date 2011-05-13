@@ -65,7 +65,7 @@ def facebook_login(request, redirect_url=None,
     if request.method == "POST":
         log.debug("OK logging in...")
         url = reverse('facebook_setup')
-        if request.POST.get(REDIRECT_FIELD_NAME,False):
+        if request.POST.get(REDIRECT_FIELD_NAME, False):
             url += "?%s=%s" % (REDIRECT_FIELD_NAME, request.POST[REDIRECT_FIELD_NAME])
         elif redirect_url:
             url += "?%s=%s" % (REDIRECT_FIELD_NAME, redirect_url)
@@ -85,8 +85,8 @@ def facebook_login(request, redirect_url=None,
             return HttpResponseRedirect(url)
     
     # User is already logged in
-    elif request.user.is_authenticated:
-        if request.REQUEST.get(REDIRECT_FIELD_NAME,False):
+    elif request.user.is_authenticated():
+        if request.REQUEST.get(REDIRECT_FIELD_NAME, False):
             redirect_url = request.REQUEST[REDIRECT_FIELD_NAME]
         elif redirect_url is None:
             redirect_url = getattr(settings, "LOGIN_REDIRECT_URL", "/")
@@ -127,13 +127,13 @@ def facebook_logout(request, redirect_url=None):
     
     """
     logout(request)
-    if getattr(request,'facebook',False):
+    if getattr(request, 'facebook', False):
         request.facebook.session_key = None
         request.facebook.uid = None
-    url = getattr(settings,'LOGOUT_REDIRECT_URL',redirect_url) or '/'
+    url = getattr(settings, 'LOGOUT_REDIRECT_URL', redirect_url) or '/'
     return HttpResponseRedirect(url)
     
-def setup(request,redirect_url=None,
+def setup(request, redirect_url=None,
           registration_form_class=FacebookUserCreationForm,
           template_name='facebook/setup.html',
           extra_context=None):
@@ -169,7 +169,7 @@ def setup(request,redirect_url=None,
     if not request.facebook.uid:
         log.debug('Need to be logged into facebook')
         url = reverse(facebook_login)
-        if request.REQUEST.get(REDIRECT_FIELD_NAME,False):
+        if request.REQUEST.get(REDIRECT_FIELD_NAME, False):
             url += "?%s=%s" % (REDIRECT_FIELD_NAME, request.REQUEST[REDIRECT_FIELD_NAME])
         return HttpResponseRedirect(url)
 
@@ -178,7 +178,7 @@ def setup(request,redirect_url=None,
     registration_form = registration_form_class()
 
     #figure out where to go after setup
-    if request.REQUEST.get(REDIRECT_FIELD_NAME,False):
+    if request.REQUEST.get(REDIRECT_FIELD_NAME, False):
         redirect_url = request.REQUEST[REDIRECT_FIELD_NAME]
     elif redirect_url is None:
         redirect_url = getattr(settings, "LOGIN_REDIRECT_URL", "/")
@@ -197,9 +197,9 @@ def setup(request,redirect_url=None,
         log.debug('Submitted form')
         #lets setup a facebook only account. The user will have to use
         #facebook to login.
-        if request.POST.get('facebook_only',False):
+        if request.POST.get('facebook_only', False):
             log.debug('Facebook Only')
-            profile = FacebookProfile(facebook_id=request.facebook.uid)
+            profile = FacebookProfile(facebook_id=request.facebook.uid, facebook=request.facebook)
             user = User(username=request.facebook.uid,
                         email=profile.email)
             user.set_unusable_password()
@@ -214,9 +214,9 @@ def setup(request,redirect_url=None,
         # user setup his/her own local account in addition to their facebook
         # account. The user will have to login with facebook unless they 
         # reset their password.
-        elif request.POST.get('register',False):
+        elif request.POST.get('register', False):
             log.debug('Register a new account')
-            profile = FacebookProfile(facebook_id=request.facebook.uid)
+            profile = FacebookProfile(facebook_id=request.facebook.uid, facebook=request.facebook)
             if profile.first_name != "(Private)":
                 fname = profile.first_name
             if profile.last_name != "(Private)":
@@ -233,15 +233,15 @@ def setup(request,redirect_url=None,
                 return HttpResponseRedirect(redirect_url)
             else:
                 request.user = User()
-                request.user.facebook_profile = FacebookProfile(facebook_id=request.facebook.uid)
+                request.user.facebook_profile = FacebookProfile(facebook_id=request.facebook.uid, facebook=request.facebook)
     
         #user logs in in with an existing account, and the two are linked.
-        elif request.POST.get('login',False):
+        elif request.POST.get('login', False):
             login_form = AuthenticationForm(data=request.POST)
 
             if login_form.is_valid():
                 user = login_form.get_user()
-                log.debug("Trying to setup FB: %s, %s" % (user,request.facebook.uid))
+                log.debug("Trying to setup FB: %s, %s" % (user, request.facebook.uid))
                 if user and user.is_active:
                     FacebookProfile.objects.get_or_create(user=user, facebook_id=request.facebook.uid)
                     log.info("Attached facebook profile %s to user %s!" % (request.facebook.uid, user))
@@ -249,7 +249,7 @@ def setup(request,redirect_url=None,
                     return HttpResponseRedirect(redirect_url)
             else:
                 request.user = User()
-                request.user.facebook_profile = FacebookProfile(facebook_id=request.facebook.uid)
+                request.user.facebook_profile = FacebookProfile(facebook_id=request.facebook.uid, facebook=request.facebook)
     
     #user didn't submit a form, but is logged in already. We'll just link up their facebook
     #account automatically.
@@ -258,17 +258,17 @@ def setup(request,redirect_url=None,
         try:
             request.user.facebook_profile
         except FacebookProfile.DoesNotExist:
-            profile = FacebookProfile(facebook_id=request.facebook.uid)
+            profile = FacebookProfile(facebook_id=request.facebook.uid, facebook=request.facebook)
             profile.user = request.user
             profile.save()
-            log.info("Attached facebook profile %s to user %s!" % (profile.facebook_id,profile.user))
+            log.info("Attached facebook profile %s to user %s!" % (profile.facebook_id, profile.user))
 
         return HttpResponseRedirect(redirect_url)
     
     # user just showed up
     else:
         log.debug('Setting up form...')
-        request.user.facebook_profile = profile = FacebookProfile(facebook_id=request.facebook.uid)
+        request.user.facebook_profile = profile = FacebookProfile(facebook_id=request.facebook.uid, facebook=request.facebook)
         login_form = AuthenticationForm(request)
         log.debug('creating a dummy user')
         fname = lname = ''
@@ -295,7 +295,7 @@ def setup(request,redirect_url=None,
     
     # we only need to set next if its been passed in the querystring or post vars
     if request.REQUEST.get(REDIRECT_FIELD_NAME, False):
-        template_dict.update( {REDIRECT_FIELD_NAME: request.REQUEST[REDIRECT_FIELD_NAME]})
+        template_dict.update({REDIRECT_FIELD_NAME: request.REQUEST[REDIRECT_FIELD_NAME]})
         
     return render_to_response(
         template_name,

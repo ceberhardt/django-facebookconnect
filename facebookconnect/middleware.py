@@ -22,29 +22,19 @@ log = logging.getLogger('facebookconnect.middleware')
 import warnings
 from datetime import datetime
 from django.core.urlresolvers import reverse
-from django.contrib.auth import logout,login
+from django.contrib.auth import logout, login
 from django.conf import settings
-from facebook import Facebook,FacebookError
+from facebook import Facebook, FacebookError
 from django.template import TemplateSyntaxError
-from django.http import HttpResponseRedirect,HttpResponse
+from django.http import HttpResponseRedirect, HttpResponse
 from urllib2 import URLError
 from facebookconnect.models import FacebookProfile
 
-try:
-    from threading import local
-except ImportError:
-    from django.utils._threading_local import local
-
-_thread_locals = local()
 
 class FacebookConnectMiddleware(object):
     """Middlware to provide a working facebook object"""
-    def process_request(self,request):
+    def process_request(self, request):
         """process incoming request"""
-
-        # clear out the storage of fb ids in the local thread
-        if hasattr(_thread_locals,'fbids'):
-            del _thread_locals.fbids
 
         try:
             # This is true if anyone has ever used the browser to log in to
@@ -90,10 +80,10 @@ class FacebookConnectMiddleware(object):
 
         return None
 
-    def process_exception(self,request,exception):
+    def process_exception(self, request, exception):
         my_ex = exception
         if type(exception) == TemplateSyntaxError:
-            if getattr(exception,'exc_info',False):
+            if getattr(exception, 'exc_info', False):
                 my_ex = exception.exc_info[1]
 
         if type(my_ex) == FacebookError:
